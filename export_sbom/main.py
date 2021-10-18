@@ -9,6 +9,7 @@ from export_sbom import spdx
 from export_sbom import config
 from export_sbom import process
 from export_sbom import projects
+from export_sbom import cyclonedx
 
 logging.basicConfig(format='%(asctime)s:%(levelname)s:%(message)s', stream=sys.stderr, level=logging.INFO)
 logging.getLogger("requests").setLevel(logging.INFO)
@@ -42,7 +43,7 @@ globals.bd = Client(
 
 
 def run():
-    print("BLACK DUCK SPDX EXPORT SCRIPT VERSION {}\n".format(globals.script_version))
+    print("BLACK DUCK SBOM EXPORT SCRIPT VERSION {}\n".format(globals.script_version))
 
     config.check_params()
 
@@ -54,18 +55,25 @@ def run():
     if config.args.recursive:
         globals.proj_list = projects.get_all_projects()
 
-    spdx_projname = spdx.spdx_mainproject(project, version)
+    if config.args.output_spdx:
+        spdx_projname = spdx.create_mainproject(project, version)
+    if config.args.output_cyclonedx:
+        cdx_projname = cyclonedx.create_mainproject(project, version)
 
     if 'hierarchical-components' in globals.bd.list_resources(version):
         hierarchical_bom = globals.bd.get_resource('hierarchical-components', parent=version)
     else:
         hierarchical_bom = []
 
-    process.process_project(version, spdx_projname, hierarchical_bom, bearer_token)
+    process.process_project(version, spdx_projname, cdx_projname, hierarchical_bom, bearer_token)
 
     print("Done")
 
-    spdx.write_spdx_file(globals.spdx)
+    if config.args.output_spdx:
+        spdx.write_file(globals.spdx)
+
+    if config.args.output_cyclonedx:
+        cyclonedx.write_file(globals.cdx)
 
 
 if __name__ == "__main__":

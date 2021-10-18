@@ -50,14 +50,14 @@ def check_params():
         args.no_copyrights = True
         args.no_files = True
 
-    if args.output_spdx == "":
-        args.output_spdx = spdx.clean_for_spdx('SPDX-' + args.project_name + "-" + args.project_version) + ".json"
+    if args.output_cyclonedx:
+        if os.path.exists(args.output_cyclonedx):
+            backup_file(args.output_cyclonedx)
+    elif args.output_spdx == "":
+        args.output_spdx = spdx.clean('SPDX-' + args.project_name + "-" + args.project_version) + ".json"
 
     if args.output_spdx and os.path.exists(args.output_spdx):
         backup_file(args.output_spdx)
-
-    if args.output_cyclonedx and os.path.exists(args.output_cyclonedx):
-        backup_file(args.output_cyclonedx)
 
 
 def backup_file(filename):

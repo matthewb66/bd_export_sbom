@@ -5,8 +5,10 @@ import sys
 
 from export_sbom import globals
 from export_sbom import config
+from export_sbom import data
 
-def clean_for_cdx(name):
+
+def clean(name):
     newname = re.sub('[;:!*()/,]', '', name)
     newname = re.sub('[ .]', '', newname)
     newname = re.sub('@', '-at-', newname)
@@ -16,12 +18,20 @@ def clean_for_cdx(name):
 
 
 def add_relationship(parent, child, reln):
+    # {
+    #   "ref": "acme-app",
+    #   "dependsOn": [
+    #     "pkg:maven/org.acme/web-framework@1.0.0",
+    #     "pkg:maven/org.acme/persistence@3.1.0"
+    #   ]
+    # },
     mydict = {
-        "spdxElementId": quote(parent),
-        "relationshipType": quote(reln),
-        "relatedSpdxElement": quote(child)
+        "ref": parent,
+        "dependsOn": [
+            child,
+        ]
     }
-    globals.spdx['relationships'].append(mydict)
+    globals.cdx['dependencies'].append(mydict)
 
 
 def add_snippet():
@@ -60,12 +70,12 @@ def add_snippet():
     pass
 
 
-def write_cdx_file(spdx):
-    print("Writing SPDX output file {} ... ".format(config.args.output_spdx), end='')
+def write_file(cdx):
+    print("Writing CYCLONEDX output file {} ... ".format(config.args.output_cyclonedx), end='')
 
     try:
-        with open(config.args.output_spdx, 'w') as outfile:
-            json.dump(spdx, outfile, indent=4, sort_keys=True)
+        with open(config.args.output_cyclonedx, 'w') as outfile:
+            json.dump(cdx, outfile, indent=4, sort_keys=True)
 
     except Exception as e:
         print('ERROR: Unable to create output report file \n' + str(e))
@@ -74,73 +84,208 @@ def write_cdx_file(spdx):
     print("Done")
 
 
-def cdx_mainproject(proj, ver):
-    globals.spdx_custom_lics = []
+def create_mainproject(proj, ver):
+    # globals.spdx_custom_lics = []
 
-    toppkg = clean_for_spdx("SPDXRef-Package-" + proj['name'] + "-" + ver['versionName'])
+    appname = clean(proj['name'] + "-" + ver['versionName'])
 
     # Define TOP Document entries
-    globals.spdx["SPDXID"] = "SPDXRef-DOCUMENT"
-    globals.spdx["spdxVersion"] = "SPDX-2.2"
-    globals.spdx["creationInfo"] = {
-        "created": quote(ver['createdAt'].split('.')[0] + 'Z'),
-        "creators": ["Tool: Black Duck SPDX export script https://github.com/matthewb66/bd_export_spdx2.2"],
+    globals.cdx["bomFormat"] = "CycloneDX"
+    globals.cdx["specVersion"] = "1.3"
+    globals.cdx["serialNumber"] = "urn:uuid:XXXXXX"
+    globals.cdx["version"] = 1
+
+    # globals.cdx['metadata'] = {}
+    globals.cdx['metadata'] = {
+        'timestamp': data.unquote(ver['createdAt'].split('.')[0] + 'Z'),
+        "tools": [
+            {
+                "vendor": "Synopsys Inc.",
+                "name": "Black Duck SBOM Exporter",
+                "version": "0.1",
+            }
+        ],
         "licenseListVersion": "3.9",
+        "component": {
+            "type": "application",
+            "name": clean(proj['name']),
+            "version": clean(ver['versionName']),
+            # "swid": {
+            #     "tagId": "swidgen-cebab27e-da95-213c-8b73-d1d3afcb806f_2.0.0",
+            #     "name": "Acme Commerce Suite",
+            #     "version": "2.0.0"
+            # },
+        },
     }
-    if 'description' in proj.keys():
-        globals.spdx["creationInfo"]["comment"] = quote(proj['description'])
-    globals.spdx["name"] = quote(proj['name'] + '/' + ver['versionName'])
-    globals.spdx["dataLicense"] = "CC0-1.0"
-    globals.spdx["documentDescribes"] = [toppkg]
-    globals.spdx["documentNamespace"] = ver['_meta']['href']
-    globals.spdx["downloadLocation"] = "NOASSERTION"
-    globals.spdx["filesAnalyzed"] = False
-    globals.spdx["copyrightText"] = "NOASSERTION"
-    globals.spdx["externalRefs"] = [
-                {
-                    "referenceCategory": "OTHER",
-                    "referenceType": "BlackDuckHub-proj",
-                    "referenceLocator": proj["_meta"]["href"],
-                },
-                {
-                    "referenceCategory": "OTHER",
-                    "referenceType": "BlackDuckHub-proj-Version",
-                    "referenceLocator": ver["_meta"]["href"]
-                }
-            ]
 
-    add_relationship("SPDXRef-DOCUMENT", toppkg, "DESCRIBES")
-    # Add top package for proj version
-    #
-    projpkg = {
-        "SPDXID": quote(toppkg),
-        "name": quote(proj['name']),
-        "versionInfo": quote(ver['versionName']),
-        # "packageFileName":  spdx.quote(package_file),
-        "licenseConcluded": "NOASSERTION",
-        "licenseDeclared": "NOASSERTION",
-        "downloadLocation": "NOASSERTION",
-        "packageComment": "Generated top level package representing Black Duck proj",
-        # PackageChecksum: SHA1: 85ed0817af83a24ad8da68c2b5094de69833983c,
-        # "licenseConcluded": spdx.quote(lic_string),
-        # "licenseDeclared": spdx.quote(lic_string),
-        # PackageLicenseComments: <text>Other versions available for a commercial license</text>,
-        "filesAnalyzed": False,
-        # "ExternalRef: SECURITY cpe23Type {}".format(cpe),
-        # "ExternalRef: PACKAGE-MANAGER purl pkg:" + pkg,
-        # ExternalRef: PERSISTENT-ID swh swh:1:cnt:94a9ed024d3859793618152ea559a168bbcbb5e2,
-        # ExternalRef: OTHER LocationRef-acmeforge acmecorp/acmenator/4.1.3-alpha,
-        # ExternalRefComment: This is the external ref for Acme,
-        "copyrightText": "NOASSERTION",
-        # annotations,
-    }
-    if 'description' in proj.keys():
-        projpkg["description"] = quote(proj['description'])
-    if 'license' in ver.keys():
-        if ver['license']['licenseDisplay'] == 'Unknown License':
-            projpkg["licenseDeclared"] = "NOASSERTION"
+    # add_relationship("SPDXRef-DOCUMENT", appname, "DESCRIBES")
+    return appname
+
+
+def process_comp(comps_dict, tcomp, comp_data_dict):
+    cver = tcomp['componentVersion']
+    if cver in comps_dict.keys():
+        # ind = compverlist.index(tcomp['componentVersion'])
+        bomentry = comps_dict[cver]
+    else:
+        bomentry = tcomp
+
+    cdxpackage_name = clean(
+        tcomp['componentName'] + "-" + tcomp['componentVersionName'])
+
+    pkg = "NOASSERTION"
+
+    if cdxpackage_name in globals.cdx_ids:
+        return pkg
+
+    globals.cdx_ids[cdxpackage_name] = 1
+    # openhub_url = None
+
+    if cver not in globals.processed_comp_list:
+        download_url = "NOASSERTION"
+
+        # fcomp = globals.bd.get_json(tcomp['component'])  # CHECK THIS
+        #
+        openhub_url = next((item for item in bomentry['_meta']['links'] if item["rel"] == "openhub"), None)
+        if config.args.download_loc and openhub_url is not None:
+            download_url = data.openhub_get_download(openhub_url['href'])
+
+        copyrights = "NOASSERTION"
+        # cpe = "NOASSERTION"
+        pkg = "NOASSERTION"
+        if not config.args.no_copyrights:
+            # copyrights, cpe, pkg = get_orig_data(bomentry)
+            copyrights = comp_data_dict[cver]['copyrights']
+
+            if 'origins' in bomentry.keys() and len(bomentry['origins']) > 0:
+                orig = bomentry['origins'][0]
+                if 'externalNamespace' in orig.keys() and 'externalId' in orig.keys():
+                    pkg = data.calculate_purl(orig['externalNamespace'], orig['externalId'])
+
+        package_file = "NOASSERTION"
+        if not config.args.no_files:
+            package_file = comp_data_dict[cver]['files']
+
+        desc = 'NOASSERTION'
+        if 'description' in tcomp.keys():
+            desc = re.sub('[^a-zA-Z.()\d\s\-:]', '', bomentry['description'])
+
+        annotations = comp_data_dict[cver]['comments']
+        lic_string = comp_data_dict[cver]['licenses']
+
+        component_package_supplier = ''
+
+        homepage = comp_data_dict[cver]['url']
+        bom_package_supplier = comp_data_dict[cver]['supplier']
+
+        packageinfo = "This is a"
+
+        if bomentry['componentType'] == 'CUSTOM_COMPONENT':
+            packageinfo = packageinfo + " custom component"
+        if bomentry['componentType'] == 'SUB_PROJECT':
+            packageinfo = packageinfo + " sub project"
         else:
-            projpkg["licenseDeclared"] = ver['license']['licenseDisplay']
-    globals.spdx['packages'].append(projpkg)
+            packageinfo = packageinfo + "n open source component from the Black Duck Knowledge Base"
 
-    return toppkg
+        if len(bomentry['matchTypes']) > 0:
+            first_type = bomentry['matchTypes'][0]
+            if first_type == 'MANUAL_BOM_COMPONENT':
+                packageinfo = packageinfo + " which was manually added"
+            else:
+                packageinfo = packageinfo + " which was automatically detected"
+                if first_type == 'FILE_EXACT':
+                    packageinfo = packageinfo + " as a direct file match"
+                elif first_type == 'SNIPPET':
+                    packageinfo = packageinfo + " as a code snippet"
+                elif first_type == 'FILE_DEPENDENCY_DIRECT':
+                    packageinfo = packageinfo + " as a directly declared dependency"
+                elif first_type == 'FILE_DEPENDENCY_TRANSITIVE':
+                    packageinfo = packageinfo + " as a transitive dependency"
+
+        packagesuppliername = ''
+
+        if bom_package_supplier is not None and len(bom_package_supplier) > 0:
+            packageinfo = packageinfo + ", the PackageSupplier was provided by the user at the BOM level"
+            packagesuppliername = packagesuppliername + bom_package_supplier
+            pkg = "supplier:{}/{}/{}".format(bom_package_supplier.replace("Organization: ", ""), tcomp['componentName'],
+                                             tcomp['componentVersionName'])
+        elif component_package_supplier is not None and len(component_package_supplier) > 0:
+            packageinfo = packageinfo + ", the PackageSupplier was populated in the component"
+            packagesuppliername = packagesuppliername + component_package_supplier
+            pkg = "supplier:{}/{}/{}".format(component_package_supplier.replace("Organization: ", ""),
+                                             tcomp['componentName'], tcomp['componentVersionName'])
+        elif bomentry['origins'] is not None and len(bomentry['origins']) > 0:
+            packagesuppliername = packagesuppliername + "Organization: " + bomentry['origins'][0]['externalNamespace']
+            packageinfo = packageinfo + ", the PackageSupplier was based on the externalNamespace"
+        else:
+            packageinfo = packageinfo + ", the PackageSupplier was not populated"
+            packagesuppliername = packagesuppliername + "NOASSERTION"
+
+        # TO DO - use packagesuppliername somewhere
+
+        thisdict = {
+            "bom-ref": pkg,
+            "type": "component",
+        #     "group": "org.acme",
+            "name": data.unquote(tcomp['componentName']),
+            "version": data.unquote(tcomp['componentVersionName']),
+            "description": data.unquote(desc),
+        #     "publisher": "Apache",
+            "purl": pkg,
+            "licenses": [
+                {
+                    "license": {
+                        "id": data.unquote(lic_string),
+                        "text": {
+                            "contentType": "text/plain",
+        #                   "encoding": "base64",
+                            "content": "",
+                        },
+        #               "url": "https://www.apache.org/licenses/LICENSE-2.0.txt"
+                    }
+                }
+            ],
+            "copyright": data.unquote(copyrights),
+            "supplier": {
+                "name": data.unquote(packagesuppliername),
+                "url": [
+                    data.unquote(homepage),
+        #             "https://example.net"
+                ],
+        #         "contact": [
+        #             {
+        #                 "name": "Example Support AMER Distribution",
+        #                 "email": "support@example.com",
+        #                 "phone": "800-555-1212"
+        #             },
+        #             {
+        #                 "name": "Example Support APAC",
+        #                 "email": "support@apac.example.com"
+        #             }
+        #         ]
+            },
+        #     "author": "Example Development Labs - Alpha Team",
+            "externalReferences": [
+                {
+                    "url": "",
+                    "comment": packageinfo,
+                },
+            ]
+        }
+
+        globals.cdx['components'].append(thisdict)
+    return pkg
+
+
+def process_comp_relationship(parentname, childname, mtypes):
+    reln = False
+    for tchecktype in globals.matchtype_depends_dict.keys():
+        if tchecktype in mtypes:
+            add_relationship(parentname, childname, globals.matchtype_depends_dict[tchecktype])
+            reln = True
+            break
+    # if not reln:
+    #     for tchecktype in globals.matchtype_contains_dict.keys():
+    #         if tchecktype in mtypes:
+    #             add_relationship(parentname, childname, globals.matchtype_contains_dict[tchecktype])
+    #             break

@@ -4,7 +4,6 @@ from lxml import html
 import requests
 
 from export_sbom import globals
-from export_sbom import spdx
 
 
 def openhub_get_download(oh_url):
@@ -84,26 +83,26 @@ def calculate_purl(namespace, extid):
             purl += "/" + globals.kb_origin_map[namespace]['p_namespace']
 
         if globals.kb_origin_map[namespace]['p_sep'] in compid:  # 5
-            purl += '/' + '/'.join(spdx.quote(s) for s in compid.split(globals.kb_origin_map[namespace]['p_sep']))
+            purl += '/' + '/'.join(unquote(s) for s in compid.split(globals.kb_origin_map[namespace]['p_sep']))
         else:  # 6
             if namespace == 'pypi':
-                purl += '/' + spdx.quote(re.sub('[-_.]+', '-', compid.lower()))
+                purl += '/' + unquote(re.sub('[-_.]+', '-', compid.lower()))
             else:
-                purl += '/' + spdx.quote(compid)
+                purl += '/' + unquote(compid)
 
         qual = {}
         if compver:
             if globals.kb_origin_map[namespace]['p_sep'] in compver:  # 9
                 compver, qual['arch'] = compver.split(globals.kb_origin_map[namespace]['p_sep'])
 
-            purl += '@' + spdx.quote(re.sub("^\d+:", '', compver))  # 7
+            purl += '@' + unquote(re.sub("^\d+:", '', compver))  # 7
 
             epoch_m = re.match('^(\d+):', compver)  # 10
             if epoch_m:
                 qual['epoch'] = epoch_m[1]
 
         if qual:
-            purl += '?' + '&'.join('='.join([k, spdx.quote(v)]) for k, v in qual.items())  # 8
+            purl += '?' + '&'.join('='.join([k, unquote(v)]) for k, v in qual.items())  # 8
 
         return purl
     return ''
@@ -147,3 +146,10 @@ def get_bom_components(verdict):
         comp_dict[compver] = comp
 
     return comp_dict
+
+
+def unquote(name):
+    remove_chars = ['"', "'"]
+    for i in remove_chars:
+        name = name.replace(i, '')
+    return name

@@ -81,12 +81,12 @@ spdx['snippets'] = []
 spdx['hasExtractedLicensingInfos'] = []
 
 cdx = dict()
-cdx['packages'] = []
-cdx['relationships'] = []
-cdx['snippets'] = []
-cdx['hasExtractedLicensingInfos'] = []
+cdx['metadata'] = {}
+cdx['components'] = []
+cdx['dependencies'] = []
 
 spdx_ids = {}
+cdx_ids = {}
 proj_list = []
 
 verify = True
