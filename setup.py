@@ -7,14 +7,14 @@ with open("README.md", "r") as fh:
     long_description = fh.read()
 
 setuptools.setup(
-    name="bd_export_spdx2.2",
-    version="0.18",
+    name="bd_export_sbom",
+    version="0.1",
     author="Matthew Brady",
     author_email="w3matt@gmail.com",
-    description="Export an SPDX version 2.2 JSON file from a Black Duck project.",
+    description="Export an SPDX or CYCLONEDX JSON file from a Black Duck project.",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://github.com/matthewb66/bd_export_spdx2.2",
+    url="https://github.com/matthewb66/bd_export_sbom",
     packages=setuptools.find_packages(),
     install_requires=['blackduck>=1.0.0',
                       'lxml',

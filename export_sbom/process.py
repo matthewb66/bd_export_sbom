@@ -26,6 +26,7 @@ def process_children(pkgname, compverurl, child_url, indenttext, comps_dict, com
             print("{}{}/{} (SKIPPED)".format(indenttext, child['componentName'], '?'))
             continue
 
+        childpkgname = ''
         if config.args.output_spdx != '':
             childpkgname = spdx.process_comp(comps_dict, child, comp_data_dict)
             count += 1
@@ -45,20 +46,20 @@ def process_children(pkgname, compverurl, child_url, indenttext, comps_dict, com
                 globals.processed_comp_list.append(child['componentVersion'])
 
         if config.args.output_cyclonedx != '':
-            childpkgname = spdx.process_comp(comps_dict, child, comp_data_dict)
+            childpkgname = cyclonedx.process_comp(comps_dict, child, comp_data_dict)
             count += 1
             if childpkgname != '':
                 reln = False
                 for tchecktype in globals.matchtype_depends_dict.keys():
                     if tchecktype in child['matchTypes']:
-                        spdx.add_relationship(pkgname, childpkgname, globals.matchtype_depends_dict[tchecktype])
+                        cyclonedx.add_relationship(pkgname, childpkgname, globals.matchtype_depends_dict[tchecktype])
                         reln = True
                         break
                 if not reln:
                     for tchecktype in globals.matchtype_contains_dict.keys():
                         if tchecktype in child['matchTypes']:
-                            spdx.add_relationship(pkgname, childpkgname,
-                                                  globals.matchtype_contains_dict[tchecktype])
+                            cyclonedx.add_relationship(pkgname, childpkgname,
+                                                       globals.matchtype_contains_dict[tchecktype])
                             break
                 globals.processed_comp_list.append(child['componentVersion'])
 
@@ -200,7 +201,7 @@ def process_project(version, projspdxname, projcdxname, hcomps, bearer_token):
                     subproj, subver = projects.check_projver(bom_component['componentName'],
                                                              bom_component['componentVersionName'])
                     compcount += process_project(subver,
-                                                 subprojspdxname, sub_hierarchical_bom, bearer_token)
+                                                 subprojspdxname, subprojspdxname, sub_hierarchical_bom, bearer_token)
                     break
                 break
 
@@ -239,7 +240,7 @@ async def async_main(compsdict, token, ver):
             url_tasks.append(url_task)
 
             supplier_task = asyncio.ensure_future(async_get_supplier(session, comp, token))
-            supplier_tasks.append(url_task)
+            supplier_tasks.append(supplier_task)
 
         print('Getting component data ... ')
         all_copyrights = dict(await asyncio.gather(*copyright_tasks))

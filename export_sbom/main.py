@@ -55,6 +55,8 @@ def run():
     if config.args.recursive:
         globals.proj_list = projects.get_all_projects()
 
+    spdx_projname = ''
+    cdx_projname = ''
     if config.args.output_spdx:
         spdx_projname = spdx.create_mainproject(project, version)
     if config.args.output_cyclonedx:
