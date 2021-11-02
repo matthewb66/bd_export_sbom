@@ -2,6 +2,7 @@
 import re
 import json
 import sys
+import datetime
 
 from export_sbom import globals
 from export_sbom import config
@@ -88,33 +89,73 @@ def create_mainproject(proj, ver):
     # globals.spdx_custom_lics = []
 
     appname = clean(proj['name'] + "-" + ver['versionName'])
+    arr = ver['_meta']['href'].split('/')
+    uuid = ''
+    if len(arr) > 7:
+        uuid = arr[7]
+
+    licname = ''
+    for lic in ver['license']['licenses']:
+        if licname != '':
+            licname += " AND "
+        licname += lic['name']
+
+    nowtime = datetime.datetime.now()
+    nowtime = nowtime.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
 
     # Define TOP Document entries
-    globals.cdx["bomFormat"] = "CycloneDX"
-    globals.cdx["specVersion"] = "1.3"
-    globals.cdx["serialNumber"] = "urn:uuid:XXXXXX"
-    globals.cdx["version"] = 1
-
-    # globals.cdx['metadata'] = {}
-    globals.cdx['metadata'] = {
-        'timestamp': data.unquote(ver['createdAt'].split('.')[0] + 'Z'),
-        "tools": [
+    globals.cdx = {
+        "bomFormat": "CycloneDX",
+        "specVersion":"1.3",
+        "serialNumber": f'urn:uuid:{uuid}',
+        "version": 1,
+        "manufacture": {
+            "name": "Synopsys Black Duck",
+            "url": "https://www.synopsys.com/software-integrity/security-testing/software-composition-analysis.html",
+            # "contact": "",
+        },
+        "supplier": {
+            "name": "",
+            "url": "",
+            "contact": "",
+        },
+        "components": [
             {
-                "vendor": "Synopsys Inc.",
-                "name": "Black Duck SBOM Exporter",
-                "version": "0.1",
-            }
+                "type": "application",
+                "name": clean(proj['name']),
+                "version": clean(ver['versionName']),
+                # "swid": {
+                #     "tagId": "swidgen-cebab27e-da95-213c-8b73-d1d3afcb806f_2.0.0",
+                #     "name": "Acme Commerce Suite",
+                #     "version": "2.0.0"
+                # },
+                "components": [],
+            },
         ],
-        "licenseListVersion": "3.9",
-        "component": {
-            "type": "application",
-            "name": clean(proj['name']),
-            "version": clean(ver['versionName']),
-            # "swid": {
-            #     "tagId": "swidgen-cebab27e-da95-213c-8b73-d1d3afcb806f_2.0.0",
-            #     "name": "Acme Commerce Suite",
-            #     "version": "2.0.0"
-            # },
+        # globals.cdx['metadata'] = {}
+        "metadata": {
+            # 'timestamp': data.unquote(ver['createdAt'].split('.')[0] + 'Z'),
+            'timestamp': data.unquote(nowtime),
+            "tools": [
+                {
+                    "vendor": "Synopsys Inc.",
+                    "name": "Black Duck SBOM Exporter",
+                    "version": "0.1",
+                }
+            ],
+            "licenseListVersion": "3.9",
+            "licenses": [
+                {
+                    "name": licname,
+                }
+            ],
+            "externalReferences": [
+                {
+                    "url": ver['_meta']['href'],
+                    "comment": "Black Duck BOM location",
+                    "type": "bom",
+                }
+            ],
         },
     }
 
@@ -133,7 +174,7 @@ def process_comp(comps_dict, tcomp, comp_data_dict):
     cdxpackage_name = clean(
         tcomp['componentName'] + "-" + tcomp['componentVersionName'])
 
-    pkg = "NOASSERTION"
+    pkg = ""
 
     if cdxpackage_name in globals.cdx_ids:
         return pkg
@@ -142,7 +183,7 @@ def process_comp(comps_dict, tcomp, comp_data_dict):
     # openhub_url = None
 
     if cver not in globals.processed_comp_list:
-        download_url = "NOASSERTION"
+        download_url = ""
 
         # fcomp = globals.bd.get_json(tcomp['component'])  # CHECK THIS
         #
@@ -150,9 +191,9 @@ def process_comp(comps_dict, tcomp, comp_data_dict):
         if config.args.download_loc and openhub_url is not None:
             download_url = data.openhub_get_download(openhub_url['href'])
 
-        copyrights = "NOASSERTION"
+        copyrights = ""
         # cpe = "NOASSERTION"
-        pkg = "NOASSERTION"
+        pkg = ""
         if not config.args.no_copyrights:
             # copyrights, cpe, pkg = get_orig_data(bomentry)
             copyrights = comp_data_dict[cver]['copyrights']
@@ -162,11 +203,11 @@ def process_comp(comps_dict, tcomp, comp_data_dict):
                 if 'externalNamespace' in orig.keys() and 'externalId' in orig.keys():
                     pkg = data.calculate_purl(orig['externalNamespace'], orig['externalId'])
 
-        package_file = "NOASSERTION"
+        package_file = ""
         if not config.args.no_files:
             package_file = comp_data_dict[cver]['files']
 
-        desc = 'NOASSERTION'
+        desc = ''
         if 'description' in tcomp.keys():
             desc = re.sub('[^a-zA-Z.()\d\s\-:]', '', bomentry['description'])
 
@@ -219,7 +260,7 @@ def process_comp(comps_dict, tcomp, comp_data_dict):
             packageinfo = packageinfo + ", the PackageSupplier was based on the externalNamespace"
         else:
             packageinfo = packageinfo + ", the PackageSupplier was not populated"
-            packagesuppliername = packagesuppliername + "NOASSERTION"
+            packagesuppliername = packagesuppliername + ""
 
         # TO DO - use packagesuppliername somewhere
 
@@ -232,19 +273,18 @@ def process_comp(comps_dict, tcomp, comp_data_dict):
             "description": data.unquote(desc),
         #     "publisher": "Apache",
             "purl": pkg,
-            "licenses": [
-                {
-                    "license": {
-                        "id": data.unquote(lic_string),
-                        "text": {
-                            "contentType": "text/plain",
-        #                   "encoding": "base64",
-                            "content": "",
-                        },
-        #               "url": "https://www.apache.org/licenses/LICENSE-2.0.txt"
-                    }
-                }
-            ],
+            "licenses": globals.cdx_lics_dict[tcomp['componentVersion']],
+        #         {
+        #             "license": {
+        #                 "id": data.unquote(lic_string),
+        #                 "text": {
+        #                     "contentType": "text/plain",
+        # #                   "encoding": "base64",
+        #                     "content": "",
+        #                 },
+        # #               "url": "https://www.apache.org/licenses/LICENSE-2.0.txt"
+        #             }
+        #         }
             "copyright": data.unquote(copyrights),
             "supplier": {
                 "name": data.unquote(packagesuppliername),
@@ -267,13 +307,15 @@ def process_comp(comps_dict, tcomp, comp_data_dict):
         #     "author": "Example Development Labs - Alpha Team",
             "externalReferences": [
                 {
-                    "url": "",
+                    "url": tcomp['componentVersion'],
+                    "type": "other",
                     "comment": packageinfo,
                 },
             ]
         }
 
-        globals.cdx['components'].append(thisdict)
+        globals.cdx['components'][0]['components'].append(thisdict)
+
     return pkg
 
 

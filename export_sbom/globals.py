@@ -2,7 +2,8 @@
 script_version = "0.1"
 
 processed_comp_list = []
-spdx_custom_lics = []
+custom_lic_list = []
+cdx_lics_dict = {}
 
 # The name of a custom attribute which should override the default package supplier
 SBOM_CUSTOM_SUPPLIER_NAME = "PackageSupplier"

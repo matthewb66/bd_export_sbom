@@ -98,6 +98,7 @@ def add_snippet():
 def write_file(spdx):
     print("Writing SPDX output file {} ... ".format(config.args.output_spdx), end='')
 
+    # globals.spdx["hasExtractedLicensingInfos"] = globals.custom_lics
     try:
         with open(config.args.output_spdx, 'w') as outfile:
             json.dump(spdx, outfile, indent=4, sort_keys=True)
@@ -110,7 +111,7 @@ def write_file(spdx):
 
 
 def create_mainproject(proj, ver):
-    globals.spdx_custom_lics = []
+    globals.custom_lic_list = []
 
     toppkg = clean("SPDXRef-Package-" + proj['name'] + "-" + ver['versionName'])
 
@@ -278,8 +279,6 @@ def process_comp(comps_dict, tcomp, comp_data_dict):
         else:
             packageinfo = packageinfo + ", the PackageSupplier was not populated"
             packagesuppliername = packagesuppliername + "NOASSERTION"
-
-        # TO DO - use packagesuppliername somewhere
 
         thisdict = {
             "SPDXID": data.unquote(spdxpackage_name),

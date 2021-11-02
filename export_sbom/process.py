@@ -13,7 +13,7 @@ from export_sbom import data
 from export_sbom import cyclonedx
 
 
-def process_children(pkgname, compverurl, child_url, indenttext, comps_dict, comp_data_dict):
+def process_children(pkgname, child_url, indenttext, comps_dict, comp_data_dict):
     res = globals.bd.get_json(child_url + '?limit=5000')
 
     count = 0
@@ -65,7 +65,7 @@ def process_children(pkgname, compverurl, child_url, indenttext, comps_dict, com
 
         if len(child['_meta']['links']) > 2:
             thisref = [d['href'] for d in child['_meta']['links'] if d['rel'] == 'children']
-            count += process_children(childpkgname, child['componentVersion'], thisref[0], "    " + indenttext,
+            count += process_children(childpkgname, thisref[0], "    " + indenttext,
                                       comps_dict, comp_data_dict)
 
     return count
@@ -84,7 +84,7 @@ def process_project(version, projspdxname, projcdxname, hcomps, bearer_token):
     start_time = time.time()
     if platform.system() == "Windows":
         asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
-    comp_data_dict = asyncio.run(async_main(bom_compsdict, bearer_token, version))
+    comp_data_dict = asyncio.run(async_main(bom_compsdict, bearer_token))
     if config.args.debug:
         print("--- %s seconds ---" % (time.time() - start_time))
 
@@ -111,7 +111,7 @@ def process_project(version, projspdxname, projcdxname, hcomps, bearer_token):
     
                 href = [d['href'] for d in hcomp['_meta']['links'] if d['rel'] == 'children']
                 if len(href) > 0:
-                    compcount += process_children(pkgname, hcomp['componentVersion'], href[0], "--> ", bom_compsdict,
+                    compcount += process_children(pkgname, href[0], "--> ", bom_compsdict,
                                                   comp_data_dict)
         if config.args.output_cyclonedx != '':        
             pkgname = cyclonedx.process_comp(bom_compsdict, hcomp, comp_data_dict)
@@ -122,7 +122,7 @@ def process_project(version, projspdxname, projcdxname, hcomps, bearer_token):
 
                 href = [d['href'] for d in hcomp['_meta']['links'] if d['rel'] == 'children']
                 if len(href) > 0:
-                    compcount += process_children(pkgname, hcomp['componentVersion'], href[0], "--> ", bom_compsdict,
+                    compcount += process_children(pkgname, href[0], "--> ", bom_compsdict,
                                                   comp_data_dict)
 
     print('Processed {} hierarchical components'.format(compcount))
@@ -154,8 +154,9 @@ def process_project(version, projspdxname, projcdxname, hcomps, bearer_token):
             spdx.process_comp_relationship(projspdxname, spdx_pkgname, bom_component['matchTypes'])
 
         if config.args.output_cyclonedx != '':
-            cdx_pkgname = cyclonedx.process_comp(bom_compsdict, bom_component, comp_data_dict)    
-            cyclonedx.process_comp_relationship(projspdxname, cdx_pkgname, bom_component['matchTypes'])
+            cdx_pkgname = cyclonedx.process_comp(bom_compsdict, bom_component, comp_data_dict)
+            if cdx_pkgname != '':
+                cyclonedx.process_comp_relationship(projspdxname, cdx_pkgname, bom_component['matchTypes'])
 
         if config.args.recursive and bom_component['componentName'] in globals.proj_list:
             #
@@ -213,7 +214,7 @@ def process_project(version, projspdxname, projcdxname, hcomps, bearer_token):
     return compcount
 
 
-async def async_main(compsdict, token, ver):
+async def async_main(compsdict, token):
     async with aiohttp.ClientSession() as session:
         copyright_tasks = []
         comment_tasks = []
@@ -315,7 +316,7 @@ async def async_get_comments(session, comp, token):
         async with session.get(thishref, headers=headers, ssl=ssl) as resp:
             result_data = await resp.json()
             mytime = datetime.datetime.now()
-            mytime.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+            # mytime = mytime.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
             for comment in result_data['items']:
                 annotations.append(
                     {
@@ -373,39 +374,56 @@ async def async_get_licenses(session, lcomp, token):
         if len(proc_item[0]['licenses']) > 1:
             proc_item = proc_item[0]['licenses']
 
+        cdx_lics = []
         for lic in proc_item:
-            thislic = ''
+
+            headers = {
+                'accept': "text/plain",
+                'Authorization': f'Bearer {token}',
+            }
+            # resp = globals.bd.session.get('/api/licenses/' + lic_ref + '/text', headers=headers)
+            lic_ref = lic['license'].split("/")[-1]
+            thishref = f"{globals.bd.base_url}/api/licenses/{lic_ref}/text"
+            async with session.get(thishref, headers=headers, ssl=ssl) as resp:
+                try:
+                    lic_text = await resp.text('utf-8')
+                except Exception as exc:
+                    print(f'ERROR: Exception in license async function {exc}')
+
+            cdxdict = {
+                'text': {
+                    'contentType': 'text/plain',
+                    'content': data.unquote(lic_text),
+                }
+            }
             if 'spdxId' in lic:
                 thislic = lic['spdxId']
                 if thislic in spdx.spdx_deprecated_dict.keys():
                     thislic = spdx.spdx_deprecated_dict[thislic]
+                cdxdict['id'] = thislic
             else:
                 # Custom license
-                try:
-                    thislic = 'LicenseRef-' + spdx.clean(lic['licenseDisplay'])
-                    lic_ref = lic['license'].split("/")[-1]
-                    headers = {
-                        'accept': "text/plain",
-                        'Authorization': f'Bearer {token}',
+                thislic = 'LicenseRef-' + spdx.clean(lic['licenseDisplay'])
+
+                if thislic not in globals.custom_lic_list:
+                    globals.custom_lic_list.append(thislic)
+                    spdxdict = {
+                        'licenseID': data.unquote(thislic),
+                        'extractedText': data.unquote(lic_text)
                     }
-                    # resp = globals.bd.session.get('/api/licenses/' + lic_ref + '/text', headers=headers)
-                    thishref = f"{globals.bd.base_url}/api/licenses/{lic_ref}/text"
-                    async with session.get(thishref, headers=headers, ssl=ssl) as resp:
-                        lic_text = await resp.content.decode("utf-8")
-                        if thislic not in globals.spdx_custom_lics:
-                            mydict = {
-                                'licenseID': data.unquote(thislic),
-                                'extractedText': data.unquote(lic_text)
-                            }
-                            globals.spdx["hasExtractedLicensingInfos"].append(mydict)
-                            globals.spdx_custom_lics.append(thislic)
-                except Exception as exc:
-                    pass
+                    globals.spdx["hasExtractedLicensingInfos"].append(spdxdict)
+
+                    cdxdict['name'] = cyclonedx.clean(thislic)
+
+            cdx_lics.append(cdxdict)
+
             if lic_string == "NOASSERTION":
                 lic_string = thislic
             else:
                 lic_string = lic_string + " AND " + thislic
                 quotes = True
+
+        globals.cdx_lics_dict[lcomp['componentVersion']] = cdx_lics
 
         if quotes:
             lic_string = "(" + lic_string + ")"
