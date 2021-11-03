@@ -8,7 +8,7 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name="bd_export_sbom",
-    version="0.1",
+    version="0.2",
     author="Matthew Brady",
     author_email="w3matt@gmail.com",
     description="Export an SPDX or CYCLONEDX JSON file from a Black Duck project.",

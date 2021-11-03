@@ -13,7 +13,7 @@ It relies on the Black Duck `hub-rest-api-python` package to access the Black Du
 
 The project name and version need to be specified. If the project name is not matched in the server then the list of projects matching the supplied project string will be displayed (and the script will terminate). If the version name is not matched for the specified project, then the list of all versions will be displayed  (and the script will terminate).
 
-An SPDX output will be created by default, and the output file can optionally be specified; the project name and version name with .json extension will be used for the default filename if nor specified. If the output file already exists, it will be renamed using a numeric extension (for example `.001`).
+An SPDX output will be created by default, and the output file can optionally be specified; the filename `SPDX-project-version.json` will be used for the default filename if none specified. If the output file already exists, it will be renamed using a numeric extension (for example `.001`).
 
 The optional `--recursive` option will traverse sub-projects to include all leaf components. If not specified, and sub-projects exist in the specified project, then the sub-projects will be skipped.
 
@@ -23,6 +23,10 @@ Other options can be specified to reduce the number of API calls to speed up scr
 ## Version 0.1
 
 First implementation
+
+## Version 0.2
+
+Changes to Cyclone JSON output
 
 # PREREQUISITES
 
@@ -80,7 +84,9 @@ The script will use the environment variables BLACKDUCK_URL and BLACKDUCK_API_TO
 
 Use the `--blackduck_trust_certs` option to trust the SSL certificate on the Black Duck server if unsigned.
 
-The `--output_spdx outfile` or `-o outfile` or `--output_cyclonedx outfile` options specify the output file. If this file already exists, the previous version will be renamed with a unique number (e.g. .001). The default file name `<project>-<version>.json` and SPDX output format will be assumed if no output file specified.
+The `--output_spdx outfile` or `-o outfile` options will output in SPDX format to the specified output file. If this file already exists, the previous version will be renamed with a unique number (e.g. .001). The default file name `SPDX-<project>-<version>.json` and SPDX output format will be assumed if no output file specified.
+
+The `--output_cyclonedx outfile` option will output in CycloneDX to the specified output file. If this file already exists, the previous version will be renamed with a unique number (e.g. .001).
 
 The `--recursive` or `-r` option will cause Black Duck sub-projects to be processed, adding the components of sub-projects to the overall SPDX output file. If the processed project version contains sub-projects and this option is not specified, they will be ignored.
 
@@ -90,7 +96,7 @@ The `--no_copyrights` option will stop the processing of component copyright tex
 
 The `--no_files` option will stop the processing of component filename (PackageFileName tag) reducing the number of API calls and time to complete the script.
 
-The `--basic` or `-b` option will stop the processing of copy, download link or package file (same as using `--no_downloads --no_copyrights --no_files` options) reducing the number of API calls and time to complete the script.
+The `--basic` or `-b` option will stop the processing of copyright, download link or package file (same as using `--no_downloads --no_copyrights --no_files` options) reducing the number of API calls and time to complete the script.
 
 # PACKAGE SUPPLIER NAME CONFIGURATION
 

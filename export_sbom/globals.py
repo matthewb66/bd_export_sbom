@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-script_version = "0.1"
+script_version = "0.2"
 
 processed_comp_list = []
 custom_lic_list = []
