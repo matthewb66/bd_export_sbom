@@ -52,14 +52,16 @@ def process_children(pkgname, child_url, indenttext, comps_dict, comp_data_dict)
                 reln = False
                 for tchecktype in globals.matchtype_depends_dict.keys():
                     if tchecktype in child['matchTypes']:
-                        cyclonedx.add_relationship(pkgname, childpkgname, globals.matchtype_depends_dict[tchecktype])
+                        # cyclonedx.add_relationship(pkgname, childpkgname, globals.matchtype_depends_dict[tchecktype])
+                        cyclonedx.add_relationship(pkgname, childpkgname)
                         reln = True
                         break
                 if not reln:
                     for tchecktype in globals.matchtype_contains_dict.keys():
                         if tchecktype in child['matchTypes']:
-                            cyclonedx.add_relationship(pkgname, childpkgname,
-                                                       globals.matchtype_contains_dict[tchecktype])
+                            # cyclonedx.add_relationship(pkgname, childpkgname,
+                            #                            globals.matchtype_contains_dict[tchecktype])
+                            cyclonedx.add_relationship(pkgname, childpkgname)
                             break
                 globals.processed_comp_list.append(child['componentVersion'])
 
@@ -391,16 +393,18 @@ async def async_get_licenses(session, lcomp, token):
                     print(f'ERROR: Exception in license async function {exc}')
 
             cdxdict = {
-                'text': {
-                    'contentType': 'text/plain',
-                    'content': data.unquote(lic_text),
+                'license': {
+                    'text': {
+                        'contentType': 'text/plain',
+                        'content': data.unquote(lic_text),
+                    },
                 }
             }
             if 'spdxId' in lic:
                 thislic = lic['spdxId']
                 if thislic in spdx.spdx_deprecated_dict.keys():
                     thislic = spdx.spdx_deprecated_dict[thislic]
-                cdxdict['id'] = thislic
+                cdxdict['license']['id'] = thislic
             else:
                 # Custom license
                 thislic = 'LicenseRef-' + spdx.clean(lic['licenseDisplay'])
@@ -413,7 +417,7 @@ async def async_get_licenses(session, lcomp, token):
                     }
                     globals.spdx["hasExtractedLicensingInfos"].append(spdxdict)
 
-                    cdxdict['name'] = cyclonedx.clean(thislic)
+                    cdxdict['license']['name'] = cyclonedx.clean(thislic)
 
             cdx_lics.append(cdxdict)
 

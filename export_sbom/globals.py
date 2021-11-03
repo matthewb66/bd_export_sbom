@@ -75,16 +75,18 @@ kb_origin_map = {
 }
 
 
-spdx = dict()
-spdx['packages'] = []
-spdx['relationships'] = []
-spdx['snippets'] = []
-spdx['hasExtractedLicensingInfos'] = []
+spdx = {
+    'packages': [],
+    'relationships': [],
+    'snippets': [],
+    'hasExtractedLicensingInfos': [],
+}
 
-cdx = dict()
-cdx['metadata'] = {}
-cdx['components'] = []
-cdx['dependencies'] = []
+cdx = {
+    'metadata': {},
+    'components': [],
+    'dependencies': [],
+}
 
 spdx_ids = {}
 cdx_ids = {}

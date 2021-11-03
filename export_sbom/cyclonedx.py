@@ -11,14 +11,14 @@ from export_sbom import data
 
 def clean(name):
     newname = re.sub('[;:!*()/,]', '', name)
-    newname = re.sub('[ .]', '', newname)
+    newname = re.sub('[ .]', '-', newname)
     newname = re.sub('@', '-at-', newname)
     newname = re.sub('_', 'uu', newname)
 
     return newname
 
 
-def add_relationship(parent, child, reln):
+def add_relationship(parent, child):
     # {
     #   "ref": "acme-app",
     #   "dependsOn": [
@@ -32,7 +32,10 @@ def add_relationship(parent, child, reln):
             child,
         ]
     }
-    globals.cdx['dependencies'].append(mydict)
+    if 'dependencies' not in globals.cdx.keys():
+        globals.cdx['dependencies'] = [mydict]
+    else:
+        globals.cdx['dependencies'].append(mydict)
 
 
 def add_snippet():
@@ -119,8 +122,20 @@ def create_mainproject(proj, ver):
             "url": "",
             "contact": "",
         },
-        "components": [
-            {
+        "components": [],
+        # globals.cdx['metadata'] = {}
+        "metadata": {
+            # 'timestamp': data.unquote(ver['createdAt'].split('.')[0] + 'Z'),
+            "timestamp": data.unquote(nowtime),
+            "tools": [
+                {
+                    "vendor": "Synopsys Inc.",
+                    "name": "Black Duck SBOM Exporter",
+                    "version": "0.1",
+                }
+            ],
+            # "licenseListVersion": "3.9",
+            "component": {
                 "type": "application",
                 "name": clean(proj['name']),
                 "version": clean(ver['versionName']),
@@ -129,35 +144,26 @@ def create_mainproject(proj, ver):
                 #     "name": "Acme Commerce Suite",
                 #     "version": "2.0.0"
                 # },
-                "components": [],
+                "licenses": [
+                    {
+                        "license": {
+                            "name": licname,
+                        }
+                    }
+                ],
+                "externalReferences": [
+                    {
+                        "url": ver['_meta']['href'],
+                        "comment": "Black Duck BOM location",
+                        "type": "bom",
+                    }
+                ],
             },
-        ],
-        # globals.cdx['metadata'] = {}
-        "metadata": {
-            # 'timestamp': data.unquote(ver['createdAt'].split('.')[0] + 'Z'),
-            'timestamp': data.unquote(nowtime),
-            "tools": [
-                {
-                    "vendor": "Synopsys Inc.",
-                    "name": "Black Duck SBOM Exporter",
-                    "version": "0.1",
-                }
-            ],
-            "licenseListVersion": "3.9",
-            "licenses": [
-                {
-                    "name": licname,
-                }
-            ],
-            "externalReferences": [
-                {
-                    "url": ver['_meta']['href'],
-                    "comment": "Black Duck BOM location",
-                    "type": "bom",
-                }
-            ],
         },
     }
+
+    if proj['description'] != '':
+        globals.cdx['metadata']['component']['description'] = clean(proj['description'])
 
     # add_relationship("SPDXRef-DOCUMENT", appname, "DESCRIBES")
     return appname
@@ -264,46 +270,19 @@ def process_comp(comps_dict, tcomp, comp_data_dict):
 
         # TO DO - use packagesuppliername somewhere
 
+        if pkg == '':
+            bomref = data.unquote(tcomp['componentName'] + '-' + tcomp['componentVersionName'])
+        else:
+            bomref = pkg
+
         thisdict = {
-            "bom-ref": pkg,
+            "bom-ref": bomref,
             "type": "component",
         #     "group": "org.acme",
             "name": data.unquote(tcomp['componentName']),
             "version": data.unquote(tcomp['componentVersionName']),
-            "description": data.unquote(desc),
         #     "publisher": "Apache",
-            "purl": pkg,
             "licenses": globals.cdx_lics_dict[tcomp['componentVersion']],
-        #         {
-        #             "license": {
-        #                 "id": data.unquote(lic_string),
-        #                 "text": {
-        #                     "contentType": "text/plain",
-        # #                   "encoding": "base64",
-        #                     "content": "",
-        #                 },
-        # #               "url": "https://www.apache.org/licenses/LICENSE-2.0.txt"
-        #             }
-        #         }
-            "copyright": data.unquote(copyrights),
-            "supplier": {
-                "name": data.unquote(packagesuppliername),
-                "url": [
-                    data.unquote(homepage),
-        #             "https://example.net"
-                ],
-        #         "contact": [
-        #             {
-        #                 "name": "Example Support AMER Distribution",
-        #                 "email": "support@example.com",
-        #                 "phone": "800-555-1212"
-        #             },
-        #             {
-        #                 "name": "Example Support APAC",
-        #                 "email": "support@apac.example.com"
-        #             }
-        #         ]
-            },
         #     "author": "Example Development Labs - Alpha Team",
             "externalReferences": [
                 {
@@ -314,7 +293,18 @@ def process_comp(comps_dict, tcomp, comp_data_dict):
             ]
         }
 
-        globals.cdx['components'][0]['components'].append(thisdict)
+        if pkg != '' and pkg != "NOASSERTION":
+            globals.cdx["purl"] = pkg
+        if desc != '' and desc != "NOASSERTION":
+            globals.cdx["description"] = data.unquote(desc)
+        if packagesuppliername != '' and packagesuppliername != "NOASSERTION":
+            globals.cdx['supplier'] = {
+                "name": data.unquote(packagesuppliername),
+            }
+        if copyrights != '' and copyrights != "NOASSERTION":
+            globals.cdx["copyright"] = data.unquote(copyrights)
+
+        globals.cdx['components'].append(thisdict)
 
     return pkg
 
@@ -323,8 +313,9 @@ def process_comp_relationship(parentname, childname, mtypes):
     reln = False
     for tchecktype in globals.matchtype_depends_dict.keys():
         if tchecktype in mtypes:
-            add_relationship(parentname, childname, globals.matchtype_depends_dict[tchecktype])
-            reln = True
+            # add_relationship(parentname, childname, globals.matchtype_depends_dict[tchecktype])
+            # reln = True
+            add_relationship(parentname, childname)
             break
     # if not reln:
     #     for tchecktype in globals.matchtype_contains_dict.keys():
